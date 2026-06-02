@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alice in Wonderland — Tim Burton Edition</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'IM Fell English', serif;
+    cursor: none;
+  }
+
+  #canvas { display: block; width: 100vw; height: 100vh; }
+
+  #cursor {
+    position: fixed; width: 20px; height: 20px;
+    border: 1.5px solid rgba(180,140,200,0.8);
+    border-radius: 50%; pointer-events: none; z-index: 9999;
+    transform: translate(-50%,-50%);
+    transition: width 0.2s, height 0.2s, border-color 0.2s;
+    mix-blend-mode: difference;
+  }
+
+  #overlay {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, #0a0005 0%, #000 100%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100; transition: opacity 1.5s ease;
+  }
+
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .title-container { text-align: center; position: relative; }
+
+  .title-main {
+    font-family: 'UnifrakturMaguntia', cursive;
+    font-size: clamp(3rem, 8vw, 7rem);
+    color: #c8a0d8;
+    text-shadow:
+      0 0 20px rgba(180,80,200,0.8),
+      0 0 60px rgba(120,40,160,0.4),
+      2px 2px 0 #1a0020;
+    letter-spacing: 0.05em;
+    animation: flicker 4s infinite;
+    line-height: 1;
+  }
+
+  .title-sub {
+    font-family: 'IM Fell English SC', serif;
+    font-size: clamp(0.8rem, 2vw, 1.2rem);
+    color: #7a5a8a;
+    letter-spacing: 0.4em;
+    margin-top: 0.5rem;
+    text-transform: uppercase;
+  }
+
+  .title-divider {
+    width: 60%; height: 1px;
+    background: linear-gradient(90deg, transparent, #8b4fa0, transparent);
+    margin: 1.5rem auto;
+  }
+
+  .enter-btn {
+    font-family: 'IM Fell English SC', serif;
+    font-size: 1rem; letter-spacing: 0.3em;
+    color: #c8a0d8; background: transparent;
+    border: 1px solid rgba(180,140,200,0.3);
+    padding: 0.8rem 2.5rem; cursor: pointer;
+    transition: all 0.4s;
+    text-transform: uppercase;
+    position: relative; overflow: hidden;
+  }
+
+  .enter-btn::before {
+    content: ''; position: absolute; inset: 0;
+    background: rgba(140,60,180,0.1);
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.4s;
+  }
+
+  .enter-btn:hover::before { transform: scaleX(1); }
+  .enter-btn:hover { border-color: rgba(200,160,220,0.7); color: #e8c8f8; }
+
+  @keyframes flicker {
+    0%,95%,100% { opacity: 1; }
+    96% { opacity: 0.8; }
+    97% { opacity: 1; }
+    98% { opacity: 0.6; }
+    99% { opacity: 1; }
+  }
+
+  #hud {
+    position: fixed; inset: 0; pointer-events: none; z-index: 50;
+    display: flex; flex-direction: column;
+    justify-content: space-between; padding: 2rem;
+  }
+
+  #zone-name {
+    font-family: 'UnifrakturMaguntia', cursive;
+    font-size: clamp(1.5rem, 3vw, 2.5rem);
+    color: rgba(200,160,220,0.9);
+    text-shadow: 0 0 20px rgba(160,80,200,0.6);
+    opacity: 0; transition: opacity 1s;
+    text-align: center;
+  }
+
+  #zone-name.visible { opacity: 1; }
+
+  #narrative-box {
+    max-width: 500px; margin: 0 auto;
+    background: rgba(5,0,10,0.85);
+    border: 1px solid rgba(120,60,150,0.4);
+    border-radius: 2px;
+    padding: 1rem 1.5rem;
+    opacity: 0; transition: opacity 0.8s;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 0 30px rgba(100,0,150,0.2), inset 0 0 20px rgba(80,0,120,0.1);
+  }
+
+  #narrative-box.visible { opacity: 1; }
+
+  #narrative-text {
+    font-family: 'IM Fell English', serif;
+    font-style: italic;
+    color: #c8b0d8; font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  #narrative-speaker {
+    font-family: 'IM Fell English SC', serif;
+    color: #9060a8; font-size: 0.75rem;
+    letter-spacing: 0.2em; margin-bottom: 0.4rem;
+  }
+
+  #controls-hint {
+    font-family: 'IM Fell English SC', serif;
+    font-size: 0.7rem; letter-spacing: 0.2em;
+    color: rgba(120,80,140,0.6);
+    text-align: center;
+  }
+
+  #loading {
+    position: fixed; inset: 0; background: #000;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; flex-direction: column; gap: 1rem;
+  }
+
+  .loading-text {
+    font-family: 'UnifrakturMaguntia', cursive;
+    color: #8050a0; font-size: 1.5rem;
+    animation: pulse 1.5s infinite;
+  }
+
+  .loading-bar {
+    width: 200px; height: 1px;
+    background: rgba(120,60,150,0.2);
+    position: relative; overflow: hidden;
+  }
+
+  .loading-bar::after {
+    content: ''; position: absolute;
+    top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, #8050a0, transparent);
+    animation: loading 1.5s infinite;
+  }
+
+  @keyframes loading { to { left: 100%; } }
+  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+  #crosshair {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 16px; height: 16px;
+    pointer-events: none; z-index: 51;
+    opacity: 0; transition: opacity 0.5s;
+  }
+
+  #crosshair.visible { opacity: 1; }
+
+  #crosshair::before, #crosshair::after {
+    content: ''; position: absolute;
+    background: rgba(180,120,200,0.6);
+  }
+
+  #crosshair::before { width: 1px; height: 100%; left: 50%; transform: translateX(-50%); }
+  #crosshair::after { height: 1px; width: 100%; top: 50%; transform: translateY(-50%); }
+
+  #portal-prompt {
+    position: fixed; bottom: 30%; left: 50%;
+    transform: translateX(-50%);
+    font-family: 'IM Fell English SC', serif;
+    font-size: 0.8rem; letter-spacing: 0.3em;
+    color: rgba(200,160,220,0.8);
+    opacity: 0; transition: opacity 0.5s;
+    pointer-events: none; z-index: 51;
+    text-shadow: 0 0 10px rgba(150,80,200,0.8);
+  }
+
+  #portal-prompt.visible { opacity: 1; }
+
+  /* Vignette */
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none; z-index: 49;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loading-text">Falling Down the Rabbit Hole...</div>
+  <div class="loading-bar"></div>
+</div>
+
+<div id="overlay">
+  <div class="title-container">
+    <div class="title-main">Alice</div>
+    <div class="title-sub">in Wonderland</div>
+    <div class="title-divider"></div>
+    <div class="title-sub" style="font-size:0.7rem;letter-spacing:0.5em;color:#4a3a5a;margin-bottom:2rem">A Tim Burton Vision</div>
+    <button class="enter-btn" id="enter-btn">Enter the Madness</button>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="cursor"></div>
+
+<div id="hud">
+  <div id="zone-name"></div>
+  <div>
+    <div id="narrative-box">
+      <div id="narrative-speaker"></div>
+      <div id="narrative-text"></div>
+    </div>
+    <div id="controls-hint" style="margin-top:0.5rem">WASD · Move &nbsp;|&nbsp; Mouse · Look &nbsp;|&nbsp; E · Interact &nbsp;|&nbsp; ESC · Release Mouse</div>
+  </div>
+</div>
+
+<div id="crosshair"></div>
+<div id="portal-prompt">[ Press E to Enter ]</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+// ─── AUDIO ENGINE ───────────────────────────────────────────────────────────
+class WonderlandAudio {
+  constructor() {
+    this.ctx = null;
+    this.masterGain = null;
+    this.currentZoneNodes = [];
+    this.zones = {
+      rabbit_hole: { root: 60, mode: 'phrygian', tempo: 60, mood: 'falling' },
+      garden:      { root: 64, mode: 'lydian',   tempo: 80, mood: 'twisted' },
+      tea_party:   { root: 55, mode: 'diminished',tempo:120, mood: 'frantic' },
+      forest:      { root: 58, mode: 'locrian',  tempo: 50, mood: 'ethereal' },
+      queens_court:{ root: 52, mode: 'phrygian', tempo: 90, mood: 'menacing' }
+    };
+  }
+
+  init() {
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.gain.value = 0.4;
+    this.masterGain.connect(this.ctx.destination);
+
+    const convolver = this.ctx.createConvolver();
+    const bufferSize = this.ctx.sampleRate * 3;
+    const impulse = this.ctx.createBuffer(2, bufferSize, this.ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = impulse.getChannelData(c);
+      for (let i = 0; i < bufferSize; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/bufferSize, 2);
+    }
+    convolver.buffer = impulse;
+    this.reverb = convolver;
+    this.reverb.connect(this.masterGain);
+  }
+
+  midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+  getScaleNotes(root, mode) {
+    const scales = {
+      phrygian:  [0,1,3,5,7,8,10],
+      lydian:    [0,2,4,6,7,9,11],
+      diminished:[0,2,3,5,6,8,9,11],
+      locrian:   [0,1,3,5,6,8,10],
+    };
+    return (scales[mode]||scales.phrygian).map(i => root + i);
+  }
+
+  playZone(zoneName) {
+    if (!this.ctx) return;
+    this.stopCurrentZone();
+    const zone = this.zones[zoneName];
+    if (!zone) return;
+
+    const notes = this.getScaleNotes(zone.root, zone.mode);
+    const intervalSec = 60 / zone.tempo;
+
+    // Drone base
+    const drone = this.ctx.createOscillator();
+    const droneGain = this.ctx.createGain();
+    drone.type = 'sawtooth';
+    drone.frequency.value = this.midiToFreq(zone.root - 12);
+    droneGain.gain.value = 0.03;
+    drone.connect(droneGain); droneGain.connect(this.reverb);
+    drone.start();
+    this.currentZoneNodes.push(drone, droneGain);
+
+    // Melodic arpeggio
+    let step = 0;
+    const arpLoop = () => {
+      if (!this.playing) return;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = zone.mood === 'frantic' ? 'square' : 'sine';
+      const note = notes[step % notes.length] + (Math.random() > 0.8 ? 12 : 0);
+      osc.frequency.value = this.midiToFreq(note);
+      g.gain.setValueAtTime(0, this.ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.08, this.ctx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + intervalSec * 0.8);
+      osc.connect(g); g.connect(this.reverb);
+      osc.start(); osc.stop(this.ctx.currentTime + intervalSec);
+      step++;
+      this.arpTimer = setTimeout(arpLoop, intervalSec * 1000 * (0.8 + Math.random() * 0.4));
+    };
+
+    this.playing = true;
+    arpLoop();
+
+    // Pad
+    for (let i = 0; i < 3; i++) {
+      const pad = this.ctx.createOscillator();
+      const padG = this.ctx.createGain();
+      pad.type = 'sine';
+      pad.frequency.value = this.midiToFreq(notes[i*2 % notes.length] + 12);
+      pad.frequency.setValueAtTime(pad.frequency.value, this.ctx.currentTime);
+      padG.gain.value = 0.015;
+      pad.connect(padG); padG.connect(this.reverb);
+      pad.start();
+      this.currentZoneNodes.push(pad, padG);
+    }
+  }
+
+  stopCurrentZone() {
+    this.playing = false;
+    clearTimeout(this.arpTimer);
+    this.currentZoneNodes.forEach(n => { try { n.stop && n.stop(); n.disconnect && n.disconnect(); } catch(e){} });
+    this.currentZoneNodes = [];
+  }
+}
+
+// ─── NARRATIVE ENGINE ───────────────────────────────────────────────────────
+class NarrativeEngine {
+  constructor() {
+    this.lastZone = null;
+    this.isTyping = false;
+    this.narrativeBox = document.getElementById('narrative-box');
+    this.narrativeText = document.getElementById('narrative-text');
+    this.narrativeSpeaker = document.getElementById('narrative-speaker');
+    this.queue = [];
+    this.characters = {
+      rabbit_hole: { name: 'The White Rabbit', color: '#a0b8d8' },
+      garden:      { name: 'The Cheshire Cat', color: '#c080d0' },
+      tea_party:   { name: 'The Mad Hatter',   color: '#d4a020' },
+      forest:      { name: 'The Caterpillar',  color: '#60a060' },
+      queens_court:{ name: 'The Red Queen',     color: '#c04040' }
+    };
+  }
+
+  async fetchNarrative(zone, action='arrive') {
+    try {
+      const resp = await fetch('/api/narrative', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zone, action })
+      });
+      const data = await resp.json();
+      return data.line || this.getFallback(zone);
+    } catch(e) {
+      return this.getFallback(zone);
+    }
+  }
+
+    getFallback(zone) {
+    const fallbacks = {
+      rabbit_hole: "Time doesn't fall here... it crumbles.",
+      garden:      "We're all mad here. You simply haven't realized it yet.",
+      tea_party:   "The tea is cold. The day is wrong. Sit down anyway.",
+      forest:      "The smoke reveals what your eyes refuse to see.",
+      queens_court:"Every head that questions me finds itself... repositioned."
+    };
+    return fallbacks[zone] || "Nothing here is what it seems. Nothing ever was.";
+  }
+
+  async showForZone(zone) {
+    if (zone === this.lastZone) return;
+    this.lastZone = zone;
+    const char = this.characters[zone] || this.characters.rabbit_hole;
+    const line = await this.fetchNarrative(zone);
+    this.show(char.name, line, char.color);
+  }
+
+  show(speaker, text, color='#c8b0d8') {
+    this.narrativeSpeaker.textContent = speaker;
+    this.narrativeSpeaker.style.color = color;
+    this.narrativeText.textContent = '';
+    this.narrativeBox.classList.add('visible');
+    this.typeText(text);
+    setTimeout(() => this.narrativeBox.classList.remove('visible'), 8000);
+  }
+
+  typeText(text) {
+    let i = 0;
+    this.narrativeText.textContent = '';
+    const timer = setInterval(() => {
+      this.narrativeText.textContent += text[i];
+      i++;
+      if (i >= text.length) clearInterval(timer);
+    }, 35);
+  }
+}
+
+// ─── WORLD BUILDER ──────────────────────────────────────────────────────────
+class WonderlandWorld {
+  constructor(scene) {
+    this.scene = scene;
+    this.portals = [];
+    this.animatedObjects = [];
+    this.zones = {};
+    this.clock = new THREE.Clock();
+  }
+
+  build() {
+    this.buildRabbitHole();
+    this.buildGarden();
+    this.buildTeaParty();
+    this.buildForest();
+    this.buildQueensCourt();
+    this.buildPortals();
+    this.addParticles();
+  }
+
+  makeGround(color, x, z, w, d) {
+    const geo = new THREE.PlaneGeometry(w, d, 20, 20);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setY(i, pos.getY(i) + (Math.random()-0.5) * 0.3);
+    }
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.1 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI/2;
+    mesh.position.set(x, 0, z);
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    return mesh;
+  }
+
+  makeTree(x, y, z, height=4, lean=0) {
+    const group = new THREE.Group();
+    // Trunk — twisted
+    const trunkGeo = new THREE.CylinderGeometry(0.08, 0.15, height, 6);
+    const pos = trunkGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const yv = pos.getY(i);
+      pos.setX(i, pos.getX(i) + yv * lean * 0.1);
+      pos.setZ(i, pos.getZ(i) + (Math.random()-0.5)*0.1);
+    }
+    trunkGeo.computeVertexNormals();
+    const trunk = new THREE.Mesh(trunkGeo, new THREE.MeshStandardMaterial({color:0x1a0f08,roughness:1}));
+    trunk.position.y = height/2;
+    group.add(trunk);
+
+    // Branches
+    for (let b = 0; b < 5; b++) {
+      const bLen = 0.8 + Math.random()*1.2;
+      const branchGeo = new THREE.CylinderGeometry(0.02, 0.05, bLen, 4);
+      const branch = new THREE.Mesh(branchGeo, new THREE.MeshStandardMaterial({color:0x120a04,roughness:1}));
+      branch.position.y = height * (0.5 + b*0.1);
+      branch.rotation.z = (Math.random()-0.5)*1.5;
+      branch.rotation.x = (Math.random()-0.5)*1;
+      branch.position.y += bLen * Math.sin(branch.rotation.z) * 0.5;
+      group.add(branch);
+    }
+
+    group.position.set(x, y, z);
+    this.scene.add(group);
+    this.animatedObjects.push({ mesh: group, type: 'tree', phase: Math.random()*Math.PI*2 });
+    return group;
+  }
+
+  makeFloatingClock(x, y, z) {
+    const group = new THREE.Group();
+    const face = new THREE.Mesh(
+      new THREE.CircleGeometry(0.3, 12),
+      new THREE.MeshStandardMaterial({color:0x2a1a0a, emissive:0x0a0500, roughness:0.8})
+    );
+    group.add(face);
+    // Hands
+    const handMat = new THREE.MeshStandardMaterial({color:0x8a6030, emissive:0x3a2010});
+    const hour = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.18, 0.01), handMat);
+    hour.position.y = 0.09; group.add(hour);
+    const min = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.24, 0.01), handMat);
+    min.position.y = 0.12; group.add(min);
+    group.position.set(x,y,z);
+    group.rotation.set((Math.random()-0.5)*0.5, Math.random()*Math.PI*2, (Math.random()-0.5)*0.8);
+    this.scene.add(group);
+    this.animatedObjects.push({mesh:group, type:'clock', phase:Math.random()*Math.PI*2, hourHand:hour, minHand:min});
+    return group;
+  }
+
+  makePlayingCard(x, y, z) {
+    const group = new THREE.Group();
+    const cardMat = new THREE.MeshStandardMaterial({
+      color:0xf0e8e0, roughness:0.3, side:THREE.DoubleSide,
+      emissive:0x100808
+    });
+    const card = new THREE.Mesh(new THREE.PlaneGeometry(0.35,0.5), cardMat);
+    const suitMat = new THREE.MeshStandardMaterial({color:0x8a0000, emissive:0x300000});
+    const suit = new THREE.Mesh(new THREE.PlaneGeometry(0.15,0.15), suitMat);
+    suit.position.z = 0.001; group.add(card); group.add(suit);
+    group.position.set(x,y,z);
+    group.rotation.set(Math.random(),Math.random(),Math.random());
+    this.scene.add(group);
+    this.animatedObjects.push({mesh:group, type:'card', phase:Math.random()*Math.PI*2, speed:0.3+Math.random()*0.5});
+    return group;
+  }
+
+  makeMushroom(x, y, z, scale=1, color=0x4a1a6a) {
+    const group = new THREE.Group();
+    const stemGeo = new THREE.CylinderGeometry(0.08*scale, 0.12*scale, 0.6*scale, 8);
+    const stem = new THREE.Mesh(stemGeo, new THREE.MeshStandardMaterial({color:0xd0c0a0,roughness:0.9}));
+    stem.position.y = 0.3*scale; group.add(stem);
+    const capGeo = new THREE.SphereGeometry(0.4*scale, 8, 6, 0, Math.PI*2, 0, Math.PI/2);
+    const cap = new THREE.Mesh(capGeo, new THREE.MeshStandardMaterial({
+      color, emissive:new THREE.Color(color).multiplyScalar(0.3), roughness:0.7
+    }));
+    cap.position.y = 0.6*scale; cap.rotation.x = Math.PI; group.add(cap);
+    // Spots
+    for (let s = 0; s < 4; s++) {
+      const spot = new THREE.Mesh(
+        new THREE.CircleGeometry(0.04*scale, 6),
+        new THREE.MeshStandardMaterial({color:0xfff0e0, emissive:0x302010})
+      );
+      const a = s * Math.PI/2 + Math.random()*0.5;
+      spot.position.set(Math.cos(a)*0.2*scale, 0.58*scale, Math.sin(a)*0.2*scale);
+      spot.lookAt(cap.position); group.add(spot);
+    }
+    group.position.set(x,y,z);
+    this.scene.add(group);
+    return group;
+  }
+
+  buildRabbitHole() {
+    const cx = 0, cz = 0;
+    this.makeGround(0x0a0510, cx, cz, 30, 30);
+    this.zones.rabbit_hole = { center: new THREE.Vector3(cx, 0, cz), radius: 14, name: 'The Rabbit Hole', color: '#5a3a8a' };
+
+    // Spiral vortex pillar
+    for (let i = 0; i < 60; i++) {
+      const t = i/60;
+      const angle = t * Math.PI * 6;
+      const r = 1 + t * 5;
+      const spiralGeo = new THREE.BoxGeometry(0.1, 0.5 + Math.random()*2, 0.1);
+      const spiralMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color().setHSL(0.75+t*0.1, 0.8, 0.1+t*0.15),
+        emissive: new THREE.Color().setHSL(0.7, 1, 0.05)
+      });
+      const s = new THREE.Mesh(spiralGeo, spiralMat);
+      s.position.set(cx + Math.cos(angle)*r, Math.random()*6, cz + Math.sin(angle)*r);
+      s.rotation.y = angle; s.castShadow = true;
+      this.scene.add(s);
+    }
+
+    // Floating clocks
+    for (let i = 0; i < 8; i++) {
+      const a = (i/8)*Math.PI*2, r = 4 + Math.random()*4;
+      this.makeFloatingClock(cx + Math.cos(a)*r, 1 + Math.random()*4, cz + Math.sin(a)*r);
+    }
+
+    // Dark trees around perimeter
+    for (let i = 0; i < 8; i++) {
+      const a = (i/8)*Math.PI*2, r = 10;
+      this.makeTree(cx+Math.cos(a)*r, 0, cz+Math.sin(a)*r, 5+Math.random()*3, (Math.random()-0.5)*2);
+    }
+
+    // Ambient point light
+    const light = new THREE.PointLight(0x4a1a8a, 2, 20);
+    light.position.set(cx, 3, cz); this.scene.add(light);
+    this.animatedObjects.push({mesh:light, type:'light_pulse', phase:0, base:2});
+  }
+
+  buildGarden() {
+    const cx = 35, cz = 0;
+    this.makeGround(0x0a1505, cx, cz, 30, 30);
+    this.zones.garden = { center: new THREE.Vector3(cx, 0, cz), radius: 14, name: 'The Twisted Garden', color: '#9060a0' };
+
+    // Dead rose bushes
+    for (let i = 0; i < 20; i++) {
+      const x = cx + (Math.random()-0.5)*24, z = cz + (Math.random()-0.5)*24;
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.03, 1+Math.random()*0.5, 4),
+        new THREE.MeshStandardMaterial({color:0x1a1005,roughness:1})
+      );
+      stem.position.set(x, 0.5, z); stem.rotation.z = (Math.random()-0.5)*0.3;
+      this.scene.add(stem);
+      // Rose head
+      const roseColor = Math.random() > 0.3 ? 0x6a0010 : 0x3a0308;
+      const rose = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        new THREE.MeshStandardMaterial({color:roseColor, emissive:new THREE.Color(roseColor).multiplyScalar(0.2), roughness:0.8})
+      );
+      rose.position.set(x, 1 + stem.scale.y, z);
+      rose.scale.y = 0.7; this.scene.add(rose);
+    }
+
+    // Crooked doorframe arch (standalone, mysterious)
+    const archMat = new THREE.MeshStandardMaterial({color:0x1a0f08, roughness:0.95});
+    const post1 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 3, 0.15), archMat);
+    post1.position.set(cx-1, 1.5, cz-5);
+    const post2 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 3, 0.15), archMat);
+    post2.position.set(cx+1, 1.5, cz-5);
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.15, 0.15), archMat);
+    lintel.position.set(cx, 3, cz-5); lintel.rotation.z = 0.05;
+    this.scene.add(post1); this.scene.add(post2); this.scene.add(lintel);
+
+    // Cheshire grin - glowing arc
+    const smileCurve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(cx-2, 2, cz+3),
+      new THREE.Vector3(cx, 2.8, cz+3),
+      new THREE.Vector3(cx+2, 2, cz+3)
+    );
+    const smilePoints = smileCurve.getPoints(20);
+    const smileGeo = new THREE.BufferGeometry().setFromPoints(smilePoints);
+    const smileMat = new THREE.LineBasicMaterial({color:0xd080e0});
+    const smile = new THREE.Line(smileGeo, smileMat);
+    this.scene.add(smile);
+    // Eyes
+    for (let e of [-1.5, 1.5]) {
+      const eye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 8, 8),
+        new THREE.MeshStandardMaterial({color:0xd080e0, emissive:0xa040c0, emissiveIntensity:2})
+      );
+      eye.position.set(cx+e, 2.4, cz+3); this.scene.add(eye);
+      this.animatedObjects.push({mesh:eye, type:'cheshire_eye', phase:Math.random()*Math.PI*2});
+    }
+
+    const light = new THREE.PointLight(0x4a2060, 1.5, 18);
+    light.position.set(cx, 2, cz); this.scene.add(light);
+  }
+
+  buildTeaParty() {
+    const cx = 0, cz = -40;
+    this.makeGround(0x0f0a05, cx, cz, 30, 30);
+    this.zones.tea_party = { center: new THREE.Vector3(cx, 0, cz), radius: 14, name: "The Mad Hatter's Tea Party", color: '#c0901a' };
+
+    // Long warped table
+    const tableTop = new THREE.Mesh(
+      new THREE.BoxGeometry(10, 0.12, 2),
+      new THREE.MeshStandardMaterial({color:0x2a1808, roughness:0.9})
+    );
+    tableTop.position.set(cx, 0.9, cz); tableTop.rotation.z = 0.03;
+    this.scene.add(tableTop);
+    for (let leg = 0; leg < 4; leg++) {
+      const lx = (leg%2===0?-1:1)*4.5, lz = (leg<2?-1:1)*0.8;
+      const legMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.08, 0.9, 6),
+        new THREE.MeshStandardMaterial({color:0x1a0f05, roughness:1})
+      );
+      legMesh.position.set(cx+lx, 0.45, cz+lz); this.scene.add(legMesh);
+    }
+
+    // Tower of teacups
+    for (let tower = 0; tower < 4; tower++) {
+      const tx = cx + (tower-1.5)*2.5;
+      for (let cup = 0; cup < 3+Math.floor(Math.random()*3); cup++) {
+        const cupScale = 0.8 - cup*0.1;
+        const cupMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.15*cupScale, 0.1*cupScale, 0.15*cupScale, 8),
+          new THREE.MeshStandardMaterial({
+            color: [0x8a6030, 0x6a4020, 0xd4c090, 0x4a6080][tower%4],
+            roughness: 0.6
+          })
+        );
+        cupMesh.position.set(tx + (Math.random()-0.5)*0.1, 1 + cup*0.2, cz + (Math.random()-0.5)*0.3);
+        cupMesh.rotation.z = (Math.random()-0.5)*0.3;
+        this.scene.add(cupMesh);
+        this.animatedObjects.push({mesh:cupMesh, type:'wobble', phase:Math.random()*Math.PI*2, amp:0.02});
+      }
+    }
+
+    // Hatter's hat
+    const hatBrim = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.6, 0.6, 0.05, 12),
+      new THREE.MeshStandardMaterial({color:0x0a0808, roughness:0.8})
+    );
+    hatBrim.position.set(cx+3, 1.2, cz-1);
+    const hatTop = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.35, 0.4, 1.2, 12),
+      new THREE.MeshStandardMaterial({color:0x120a08, roughness:0.9})
+    );
+    hatTop.position.set(cx+3, 1.8, cz-1);
+    // Hat band
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.41, 0.41, 0.18, 12),
+      new THREE.MeshStandardMaterial({color:0x803010, emissive:0x200800, roughness:0.7})
+    );
+    band.position.set(cx+3, 1.28, cz-1);
+    this.scene.add(hatBrim); this.scene.add(hatTop); this.scene.add(band);
+    this.animatedObjects.push({mesh:hatTop, type:'float', phase:1.2, amp:0.08, baseY:1.8});
+
+    // Playing cards flying
+    for (let c = 0; c < 12; c++) {
+      this.makePlayingCard(
+        cx + (Math.random()-0.5)*20,
+        1 + Math.random()*4,
+        cz + (Math.random()-0.5)*20
+      );
+    }
+
+    const light = new THREE.PointLight(0x806020, 2, 18);
+    light.position.set(cx, 3, cz); this.scene.add(light);
+    const light2 = new THREE.PointLight(0xa04010, 1, 10);
+    light2.position.set(cx-3, 2, cz+2); this.scene.add(light2);
+  }
+
+  buildForest() {
+    const cx = -35, cz = 0;
+    this.makeGround(0x050a05, cx, cz, 30, 30);
+    this.zones.forest = { center: new THREE.Vector3(cx, 0, cz), radius: 14, name: 'The Caterpillar Forest', color: '#408040' };
+
+    // Dense dark trees
+    for (let i = 0; i < 20; i++) {
+      const x = cx + (Math.random()-0.5)*26, z = cz + (Math.random()-0.5)*26;
+      const d = Math.sqrt((x-cx)**2 + (z-cz)**2);
+      if (d > 3) this.makeTree(x, 0, z, 4+Math.random()*5, (Math.random()-0.5)*3);
+    }
+
+    // Giant mushrooms
+    const mushColors = [0x4a1a8a, 0x1a4a2a, 0x6a1a1a, 0x1a3a5a];
+    for (let m = 0; m < 8; m++) {
+      const a = (m/8)*Math.PI*2, r = 4 + Math.random()*5;
+      this.makeMushroom(
+        cx + Math.cos(a)*r, 0,
+        cz + Math.sin(a)*r,
+        1 + Math.random()*1.5,
+        mushColors[m%4]
+      );
+    }
+
+    // Central giant mushroom — the throne
+    this.makeMushroom(cx, 0, cz, 3, 0x3a1a5a);
+
+    // Blue smoke particles
+    for (let s = 0; s < 30; s++) {
+      const smokeGeo = new THREE.SphereGeometry(0.1 + Math.random()*0.2, 6, 6);
+      const smokeMat = new THREE.MeshStandardMaterial({
+        color:0x203040, transparent:true, opacity:0.3+Math.random()*0.3
+      });
+      const smoke = new THREE.Mesh(smokeGeo, smokeMat);
+      smoke.position.set(cx+(Math.random()-0.5)*6, 1+Math.random()*3, cz+(Math.random()-0.5)*6);
+      this.scene.add(smoke);
+      this.animatedObjects.push({mesh:smoke, type:'smoke', phase:Math.random()*Math.PI*2, speed:0.2+Math.random()*0.3});
+    }
+
+    const light = new THREE.PointLight(0x204030, 1.5, 18);
+    light.position.set(cx, 2, cz); this.scene.add(light);
+    // Bioluminescent glow from mushrooms
+    const glow = new THREE.PointLight(0x2a0060, 1, 8);
+    glow.position.set(cx, 3, cz); this.scene.add(glow);
+    this.animatedObjects.push({mesh:glow, type:'light_pulse', phase:1, base:1});
+  }
+
+  buildQueensCourt() {
+    const cx = 0, cz = 40;
+    this.makeGround(0x100505, cx, cz, 30, 30);
+    this.zones.queens_court = { center: new THREE.Vector3(cx, 0, cz), radius: 14, name: "The Queen's Croquet Ground", color: '#c03030' };
+
+    // Red & white checkerboard pattern via tiles
+    for (let tx = -6; tx <= 6; tx++) {
+      for (let tz = -6; tz <= 6; tz++) {
+        const isRed = (tx+tz)%2===0;
+        const tile = new THREE.Mesh(
+          new THREE.BoxGeometry(1, 0.05, 1),
+          new THREE.MeshStandardMaterial({color: isRed?0x3a0808:0x1a1010, roughness:0.8})
+        );
+        tile.position.set(cx+tx, 0.025, cz+tz);
+        this.scene.add(tile);
+      }
+    }
+
+    // Throne
+    const throneMat = new THREE.MeshStandardMaterial({color:0x5a0808, emissive:0x100000, roughness:0.7});
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 1), throneMat);
+    seat.position.set(cx, 0.6, cz-8);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.5, 0.2), throneMat);
+    back.position.set(cx, 1.85, cz-8.4);
+    const crown1 = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 4), new THREE.MeshStandardMaterial({color:0xd0a000, emissive:0x403000}));
+    crown1.position.set(cx, 3.2, cz-8.4);
+    this.scene.add(seat); this.scene.add(back); this.scene.add(crown1);
+
+    // Card soldiers
+    const soldierMat = new THREE.MeshStandardMaterial({color:0x6a0808, roughness:0.8});
+    for (let s = 0; s < 8; s++) {
+      const side = s < 4 ? -1 : 1;
+      const idx = s % 4;
+      const soldier = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.8, 0.06), soldierMat);
+      body.position.y = 0.5;
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.06), new THREE.MeshStandardMaterial({color:0x8a0808}));
+      head.position.y = 1.0;
+      soldier.add(body); soldier.add(head);
+      soldier.position.set(cx + side*3, 0, cz - 3 + idx*2);
+      soldier.rotation.y = side > 0 ? -Math.PI/2 : Math.PI/2;
+      this.scene.add(soldier);
+    }
+
+    // Off-with-their-heads stakes (dark)
+    for (let stake = 0; stake < 4; stake++) {
+      const a = (stake/4)*Math.PI*2, r = 7;
+      const st = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.06, 2+Math.random(), 4),
+        new THREE.MeshStandardMaterial({color:0x0f0808, roughness:1})
+      );
+      st.position.set(cx+Math.cos(a)*r, 1, cz+Math.sin(a)*r);
+      // Skull-like sphere on top
+      const skull = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15, 8, 8),
+        new THREE.MeshStandardMaterial({color:0xe8d8c0, emissive:0x100800, roughness:0.7})
+      );
+      skull.position.set(cx+Math.cos(a)*r, 2.2+Math.random()*0.3, cz+Math.sin(a)*r);
+      this.scene.add(st); this.scene.add(skull);
+      this.animatedObjects.push({mesh:skull, type:'float', phase:stake*0.5, amp:0.05, baseY:skull.position.y});
+    }
+
+    const light = new THREE.PointLight(0x800000, 2.5, 20);
+    light.position.set(cx, 3, cz); this.scene.add(light);
+    const light2 = new THREE.PointLight(0x400000, 1, 10);
+    light2.position.set(cx, 0.5, cz-8); this.scene.add(light2);
+  }
+
+  buildPortals() {
+    const connections = [
+      { from: new THREE.Vector3(14, 0, 0),   to: new THREE.Vector3(21, 0, 0),   zone: 'garden'       },
+      { from: new THREE.Vector3(-14, 0, 0),  to: new THREE.Vector3(-21, 0, 0),  zone: 'forest'       },
+      { from: new THREE.Vector3(0, 0, -14),  to: new THREE.Vector3(0, 0, -26),  zone: 'tea_party'    },
+      { from: new THREE.Vector3(0, 0, 14),   to: new THREE.Vector3(0, 0, 26),   zone: 'queens_court' },
+    ];
+
+    connections.forEach(conn => {
+      const portalGeo = new THREE.TorusGeometry(1.2, 0.08, 8, 32);
+      const portalMat = new THREE.MeshStandardMaterial({
+        color:0x8a40c0, emissive:0x5010a0, emissiveIntensity:1.5, roughness:0.3
+      });
+      const portal = new THREE.Mesh(portalGeo, portalMat);
+      portal.position.copy(conn.from); portal.position.y = 1.3;
+
+      // Portal fill
+      const fillGeo = new THREE.CircleGeometry(1.15, 32);
+      const fillMat = new THREE.MeshStandardMaterial({
+        color:0x20004a, emissive:0x100028, transparent:true, opacity:0.6, side:THREE.DoubleSide
+      });
+      const fill = new THREE.Mesh(fillGeo, fillMat);
+      fill.position.copy(conn.from); fill.position.y = 1.3;
+
+      this.scene.add(portal); this.scene.add(fill);
+      this.portals.push({ mesh: portal, fill, destination: conn.to, zone: conn.zone, pos: conn.from.clone() });
+      this.animatedObjects.push({mesh: portal, type: 'portal_spin', phase: Math.random()*Math.PI*2});
+      this.animatedObjects.push({mesh: fill, type: 'portal_pulse', phase: Math.random()*Math.PI*2, mat: fillMat});
+    });
+  }
+
+  addParticles() {
+    // Global floating dust
+    const count = 300;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i*3]   = (Math.random()-0.5)*80;
+      pos[i*3+1] = Math.random()*8;
+      pos[i*3+2] = (Math.random()-0.5)*80;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({color:0x8060a0, size:0.04, transparent:true, opacity:0.6});
+    const particles = new THREE.Points(geo, mat);
+    this.scene.add(particles);
+    this.animatedObjects.push({mesh:particles, type:'particles'});
+    this.particlePositions = pos;
+    this.particleCount = count;
+  }
+
+  update(dt) {
+    const t = this.clock.getElapsedTime();
+    this.animatedObjects.forEach(obj => {
+      if (!obj.mesh) return;
+      switch(obj.type) {
+        case 'tree':
+          obj.mesh.rotation.z = Math.sin(t*0.5 + obj.phase) * 0.03;
+          obj.mesh.rotation.x = Math.cos(t*0.3 + obj.phase) * 0.02;
+          break;
+        case 'clock':
+          obj.mesh.rotation.y = t * 0.1 + obj.phase;
+          obj.mesh.position.y += Math.sin(t + obj.phase) * 0.002;
+          if(obj.hourHand) obj.hourHand.rotation.z = t * 0.1;
+          if(obj.minHand) obj.minHand.rotation.z = t * 0.8;
+          break;
+        case 'card':
+          obj.mesh.position.y += Math.sin(t*obj.speed + obj.phase)*0.002;
+          obj.mesh.rotation.x += 0.005;
+          obj.mesh.rotation.y += 0.003;
+          break;
+        case 'float':
+          obj.mesh.position.y = obj.baseY + Math.sin(t + obj.phase) * obj.amp;
+          break;
+        case 'wobble':
+          obj.mesh.rotation.z = Math.sin(t*2+obj.phase)*0.05;
+          break;
+        case 'smoke':
+          obj.mesh.position.y += dt * obj.speed * 0.3;
+          obj.mesh.position.x += Math.sin(t+obj.phase)*0.002;
+          if(obj.mesh.position.y > 5) obj.mesh.position.y = 0.5;
+          obj.mesh.material.opacity = 0.1 + Math.sin(t*0.5+obj.phase)*0.15;
+          break;
+        case 'light_pulse':
+          obj.mesh.intensity = obj.base + Math.sin(t*1.5+obj.phase)*0.5;
+          break;
+        case 'cheshire_eye':
+          obj.mesh.scale.setScalar(0.5 + Math.abs(Math.sin(t*0.8+obj.phase))*0.8);
+          obj.mesh.material.emissiveIntensity = 1 + Math.sin(t*2+obj.phase);
+          break;
+        case 'portal_spin':
+          obj.mesh.rotation.z = t * 0.5;
+          break;
+        case 'portal_pulse':
+          if(obj.mat) obj.mat.opacity = 0.3 + Math.sin(t*2+obj.phase)*0.2;
+          break;
+        case 'particles':
+          const pos = obj.mesh.geometry.attributes.position.array;
+          for(let i = 0; i < this.particleCount; i++) {
+            pos[i*3+1] += 0.002;
+            if(pos[i*3+1] > 8) pos[i*3+1] = 0;
+          }
+          obj.mesh.geometry.attributes.position.needsUpdate = true;
+          break;
+      }
+    });
+  }
+
+  getCurrentZone(playerPos) {
+    let closest = null, minDist = Infinity;
+    for (const [key, zone] of Object.entries(this.zones)) {
+      const d = playerPos.distanceTo(zone.center);
+      if (d < minDist) { minDist = d; closest = key; }
+    }
+    return minDist < 14 ? closest : null;
+  }
+
+  getNearbyPortal(playerPos, threshold=3) {
+    for (const portal of this.portals) {
+      const d = playerPos.distanceTo(portal.pos);
+      if (d < threshold) return portal;
+    }
+    return null;
+  }
+}
+
+// ─── MAIN APP ────────────────────────────────────────────────────────────────
+class AliceApp {
+  constructor() {
+    this.canvas = document.getElementById('canvas');
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 0.6;
+    this.renderer.fog = new THREE.FogExp2(0x000008, 0.025);
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x000008);
+    this.scene.fog = new THREE.FogExp2(0x000008, 0.025);
+
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 100);
+    this.camera.position.set(0, 1.7, 0);
+
+    this.controls = new PointerLockControls(this.camera, this.canvas);
+    this.scene.add(this.controls.getObject());
+
+    this.audio = new WonderlandAudio();
+    this.narrative = new NarrativeEngine();
+    this.world = new WonderlandWorld(this.scene);
+
+    this.keys = {};
+    this.velocity = new THREE.Vector3();
+    this.direction = new THREE.Vector3();
+    this.currentZone = null;
+    this.clock = new THREE.Clock();
+    this.isLocked = false;
+
+    this.setupLighting();
+    this.setupEvents();
+  }
+
+  setupLighting() {
+    const ambient = new THREE.AmbientLight(0x0a0510, 0.8);
+    this.scene.add(ambient);
+
+    // Moonlight
+    const moon = new THREE.DirectionalLight(0x3a2050, 0.5);
+    moon.position.set(10, 20, 5);
+    moon.castShadow = true;
+    moon.shadow.mapSize.set(1024, 1024);
+    this.scene.add(moon);
+  }
+
+  setupEvents() {
+    window.addEventListener('keydown', e => { this.keys[e.code] = true; });
+    window.addEventListener('keyup', e => { this.keys[e.code] = false; });
+    window.addEventListener('resize', () => {
+      this.camera.aspect = window.innerWidth/window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Custom cursor
+    const cursor = document.getElementById('cursor');
+    window.addEventListener('mousemove', e => {
+      cursor.style.left = e.clientX + 'px';
+      cursor.style.top = e.clientY + 'px';
+    });
+
+    this.controls.addEventListener('lock', () => {
+      this.isLocked = true;
+      document.getElementById('crosshair').classList.add('visible');
+      cursor.style.display = 'none';
+    });
+    this.controls.addEventListener('unlock', () => {
+      this.isLocked = false;
+      document.getElementById('crosshair').classList.remove('visible');
+      cursor.style.display = 'block';
+    });
+
+    // Portal interaction
+    window.addEventListener('keydown', e => {
+      if (e.code === 'KeyE') {
+        const pos = this.controls.getObject().position;
+        const portal = this.world.getNearbyPortal(pos);
+        if (portal) this.teleportTo(portal);
+      }
+    });
+
+    // Enter button
+    document.getElementById('enter-btn').addEventListener('click', () => {
+      document.getElementById('overlay').classList.add('hidden');
+      this.audio.init();
+      this.audio.playZone('rabbit_hole');
+      this.narrative.show('The White Rabbit', "You're late. You're always late. Down here, time means nothing at all.", '#a0b8d8');
+      setTimeout(() => this.controls.lock(), 500);
+    });
+  }
+
+  teleportTo(portal) {
+    const obj = this.controls.getObject();
+    obj.position.copy(portal.destination);
+    obj.position.y = 1.7;
+    // Flash effect
+    const flash = document.createElement('div');
+    flash.style.cssText = 'position:fixed;inset:0;background:rgba(80,0,120,0.8);z-index:200;transition:opacity 0.5s;pointer-events:none;';
+    document.body.appendChild(flash);
+    setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 500); }, 100);
+  }
+
+  updateMovement(dt) {
+    if (!this.isLocked) return;
+    const speed = 5;
+    this.direction.z = (this.keys['KeyW']||this.keys['ArrowUp'] ? 1 : 0) - (this.keys['KeyS']||this.keys['ArrowDown'] ? 1 : 0);
+    this.direction.x = (this.keys['KeyD']||this.keys['ArrowRight'] ? 1 : 0) - (this.keys['KeyA']||this.keys['ArrowLeft'] ? 1 : 0);
+    this.direction.normalize();
+
+    this.velocity.x += this.direction.x * speed * dt;
+    this.velocity.z += this.direction.z * speed * dt;
+    this.velocity.x *= 0.85; this.velocity.z *= 0.85;
+
+    this.controls.moveRight(this.velocity.x * dt);
+    this.controls.moveForward(this.velocity.z * dt);
+    this.controls.getObject().position.y = 1.7;
+  }
+
+  updateZone() {
+    const pos = this.controls.getObject().position;
+    const zone = this.world.getCurrentZone(pos);
+
+    if (zone && zone !== this.currentZone) {
+      this.currentZone = zone;
+      const zoneData = this.world.zones[zone];
+      const nameEl = document.getElementById('zone-name');
+      nameEl.style.color = zoneData.color;
+      nameEl.textContent = zoneData.name;
+      nameEl.classList.add('visible');
+      setTimeout(() => nameEl.classList.remove('visible'), 3000);
+
+      this.audio.playZone(zone);
+      this.narrative.showForZone(zone);
+    }
+
+    // Portal prompt
+    const portal = this.world.getNearbyPortal(pos);
+    document.getElementById('portal-prompt').classList.toggle('visible', !!portal);
+  }
+
+  animate() {
+    requestAnimationFrame(() => this.animate());
+    const dt = this.clock.getDelta();
+    this.updateMovement(dt);
+    this.updateZone();
+    this.world.update(dt);
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  async init() {
+    document.getElementById('loading').style.display = 'flex';
+    this.world.build();
+    await new Promise(r => setTimeout(r, 1200));
+    document.getElementById('loading').style.display = 'none';
+    this.animate();
+  }
+}
+
+const app = new AliceApp();
+app.init();
+</script>
+</body>
+</html>
